@@ -1,0 +1,45 @@
+name: Intraday pick monitor
+
+on:
+  schedule:
+    # A-share sessions in Asia/Shanghai:
+    # 09:25-11:30 and 13:00-15:00 = 01:25-03:30 and 05:00-07:00 UTC.
+    # GitHub cron granularity is UTC; the script filters exact trading windows.
+    - cron: "*/5 1-3,5-7 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  intraday-monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Monitor latest pick and push if triggered
+        env:
+          WXPUSHER_APP_TOKEN: ${{ secrets.WXPUSHER_APP_TOKEN }}
+          WXPUSHER_UIDS: ${{ secrets.WXPUSHER_UIDS }}
+        run: python scripts/intraday_pick_monitor.py
+
+      - name: Persist intraday alert state
+        run: |
+          if [ ! -f state/intraday_alerts.json ]; then
+            echo "No intraday alert state to persist."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state/intraday_alerts.json
+          git diff --cached --quiet || git commit -m "Update intraday alert state"
+          git push
