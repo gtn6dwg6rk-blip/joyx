@@ -15,6 +15,7 @@ import textwrap
 import urllib.error
 import urllib.parse
 import urllib.request
+from pathlib import Path
 from typing import Any
 
 
@@ -32,6 +33,9 @@ INDEXES = [
     ("0.399006", "创业板指"),
     ("1.000688", "科创50"),
 ]
+
+STATE_DIR = Path("state")
+LATEST_PICK_PATH = STATE_DIR / "latest_pick.json"
 
 
 def http_json(url: str, *, method: str = "GET", payload: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -198,20 +202,61 @@ def collect_market_data() -> dict[str, Any]:
     }
 
 
+def primary_pick(market_data: dict[str, Any]) -> dict[str, Any]:
+    candidates = market_data.get("candidate_pool") or market_data.get("top_amount_stocks") or []
+    return candidates[0] if candidates else {}
+
+
+def build_buy_plan(pick: dict[str, Any]) -> dict[str, Any]:
+    close = safe_float(pick.get("price")) or 0
+    high = safe_float(pick.get("high")) or close
+    low = safe_float(pick.get("low")) or close
+    if close <= 0:
+        return {}
+    return {
+        "pullback_min": round(max(low, close * 0.97), 2),
+        "pullback_max": round(close * 0.995, 2),
+        "strong_min": round(max(close * 1.005, high * 1.001), 2),
+        "strong_max": round(close * 1.03, 2),
+        "no_chase_above": round(close * 1.05, 2),
+        "stop_below": round(max(low * 0.995, close * 0.96), 2),
+        "hard_stop_below": round(low * 0.99, 2),
+    }
+
+
+def save_latest_pick(market_data: dict[str, Any], report: str) -> dict[str, Any]:
+    pick = primary_pick(market_data)
+    state = {
+        "recommendation_date": dt.datetime.now(dt.timezone(dt.timedelta(hours=8))).strftime("%Y-%m-%d"),
+        "generated_at": market_data.get("generated_at"),
+        "pick": pick,
+        "buy_plan": build_buy_plan(pick),
+        "report_excerpt": report[:1200],
+        "disclaimer": "仅供研究观察，不构成投资建议，不承诺收益。",
+    }
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    LATEST_PICK_PATH.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+    return state
+
+
 def build_prompt(market_data: dict[str, Any]) -> str:
     today = dt.datetime.now(dt.timezone(dt.timedelta(hours=8))).strftime("%Y-%m-%d")
+    pick = primary_pick(market_data)
     return f"""
 你是一个谨慎的 A股短线复盘助手。请基于下面 JSON 数据，生成“晚间复盘 + 次日候选”。
 
 要求：
 1. 只推荐 1 只 A股，适合作为隔天观察候选，不要给组合。
-2. 优先考虑：资金活跃、成交额高、换手适中、当天表现强、短线情绪有延续可能的标的。
-3. 必须包含：今日大盘、活跃方向、候选股票、当天股价数据、推荐逻辑、次日买入思路、风险提示。
-4. 买入思路要给观察条件和价格区间思路，但不要写成命令式买入。
-5. 必须写：仅供研究观察，不构成投资建议，不承诺收益。
-6. 如果数据不足，明确说明数据口径，不要编造。
+2. 必须推荐 primary_pick 里的股票；如果数据明显异常，说明异常但仍围绕 primary_pick 给观察计划。
+3. 优先考虑：资金活跃、成交额高、换手适中、当天表现强、短线情绪有延续可能的标的。
+4. 必须包含：今日大盘、活跃方向、候选股票、当天股价数据、推荐逻辑、次日买入思路、风险提示。
+5. 买入思路要给观察条件和价格区间思路，但不要写成命令式买入。
+6. 必须写：仅供研究观察，不构成投资建议，不承诺收益。
+7. 如果数据不足，明确说明数据口径，不要编造。
 
 日期：{today}
+primary_pick：
+{json.dumps(pick, ensure_ascii=False, indent=2)}
 数据：
 {json.dumps(market_data, ensure_ascii=False, indent=2)}
 """.strip()
@@ -316,8 +361,11 @@ def main() -> int:
     try:
         market_data = collect_market_data()
         report = call_openai(build_prompt(market_data)) or fallback_report(market_data)
+        latest_pick = save_latest_pick(market_data, report)
         push_result = push_wxpusher(report)
         print(report)
+        print("\n--- Latest pick state ---")
+        print(json.dumps(latest_pick, ensure_ascii=False, indent=2))
         print("\n--- WxPusher result ---")
         safe_result = dict(push_result)
         if "appToken" in safe_result:
@@ -331,4 +379,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
