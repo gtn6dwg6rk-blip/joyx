@@ -6,6 +6,9 @@ on:
     - cron: "0 13 * * *"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   daily-review:
     runs-on: ubuntu-latest
@@ -26,4 +29,12 @@ jobs:
           WXPUSHER_APP_TOKEN: ${{ secrets.WXPUSHER_APP_TOKEN }}
           WXPUSHER_UIDS: ${{ secrets.WXPUSHER_UIDS }}
         run: python scripts/daily_a_share_review.py
+
+      - name: Persist latest pick state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state/latest_pick.json
+          git diff --cached --quiet || git commit -m "Update latest A-share pick state"
+          git push
 
