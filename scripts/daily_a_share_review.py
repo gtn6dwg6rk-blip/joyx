@@ -47,15 +47,15 @@ def http_json(url: str, *, method: str = "GET", payload: dict[str, Any] | None =
         headers["Content-Type"] = "application/json"
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
     last_error: Exception | None = None
-    for attempt in range(3):
+    for attempt in range(2):
         try:
-            with urllib.request.urlopen(req, timeout=45) as resp:
+            with urllib.request.urlopen(req, timeout=15) as resp:
                 raw = resp.read().decode("utf-8", errors="replace")
             return json.loads(raw)
         except (urllib.error.URLError, TimeoutError) as exc:
             last_error = exc
-            if attempt < 2:
-                time.sleep(2 + attempt * 3)
+            if attempt < 1:
+                time.sleep(2)
     raise RuntimeError(f"request failed after retries: {url} ({last_error})")
 
 
