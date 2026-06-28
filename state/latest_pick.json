@@ -1,6 +1,6 @@
 {
   "recommendation_date": "2026-06-28",
-  "generated_at": "2026-06-28T16:22:55+08:00",
+  "generated_at": "2026-06-28T16:26:17+08:00",
   "pick": {
     "code": "000725",
     "name": "京东方Ａ",
@@ -23,8 +23,8 @@
     "pullback_min": 7.56,
     "pullback_max": 7.75,
     "strong_min": 8.25,
-    "strong_max": 8.02,
-    "no_chase_above": 8.18,
+    "strong_max": 8.42,
+    "no_chase_above": 8.42,
     "stop_below": 7.48,
     "hard_stop_below": 7.29
   },
