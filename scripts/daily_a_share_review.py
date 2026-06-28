@@ -222,12 +222,14 @@ def build_buy_plan(pick: dict[str, Any]) -> dict[str, Any]:
     low = safe_float(pick.get("low")) or close
     if close <= 0:
         return {}
+    strong_min = round(max(close * 1.005, high * 1.001), 2)
+    strong_max = round(max(strong_min * 1.02, close * 1.06), 2)
     return {
         "pullback_min": round(max(low, close * 0.97), 2),
         "pullback_max": round(close * 0.995, 2),
-        "strong_min": round(max(close * 1.005, high * 1.001), 2),
-        "strong_max": round(close * 1.03, 2),
-        "no_chase_above": round(close * 1.05, 2),
+        "strong_min": strong_min,
+        "strong_max": strong_max,
+        "no_chase_above": round(max(strong_max, close * 1.08), 2),
         "stop_below": round(max(low * 0.995, close * 0.96), 2),
         "hard_stop_below": round(low * 0.99, 2),
     }
