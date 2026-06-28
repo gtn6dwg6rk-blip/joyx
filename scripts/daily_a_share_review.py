@@ -12,6 +12,7 @@ import json
 import os
 import sys
 import textwrap
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -45,9 +46,17 @@ def http_json(url: str, *, method: str = "GET", payload: dict[str, Any] | None =
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         headers["Content-Type"] = "application/json"
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        raw = resp.read().decode("utf-8", errors="replace")
-    return json.loads(raw)
+    last_error: Exception | None = None
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(req, timeout=45) as resp:
+                raw = resp.read().decode("utf-8", errors="replace")
+            return json.loads(raw)
+        except (urllib.error.URLError, TimeoutError) as exc:
+            last_error = exc
+            if attempt < 2:
+                time.sleep(2 + attempt * 3)
+    raise RuntimeError(f"request failed after retries: {url} ({last_error})")
 
 
 def eastmoney_stock_sec_id(code: str) -> str:
