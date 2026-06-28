@@ -1,0 +1,29 @@
+name: Daily A-share review
+
+on:
+  schedule:
+    # 21:00 Asia/Shanghai = 13:00 UTC
+    - cron: "0 13 * * *"
+  workflow_dispatch:
+
+jobs:
+  daily-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run daily review and push
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-5' }}
+          WXPUSHER_APP_TOKEN: ${{ secrets.WXPUSHER_APP_TOKEN }}
+          WXPUSHER_UIDS: ${{ secrets.WXPUSHER_UIDS }}
+        run: python scripts/daily_a_share_review.py
+
