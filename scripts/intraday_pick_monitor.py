@@ -228,7 +228,15 @@ def main() -> int:
             "仅供研究观察，不构成投资建议，不承诺收益。",
         ]
     )
-    result = push_wxpusher(content, f"{pick.get('name')} {code} 盘中提醒")
+    summary_price = quote.get("price")
+    summary_pct = quote.get("pct")
+    summary = f"{pick.get('name')} {code} 盘中提醒"
+    if summary_price is not None:
+        summary += f" 当前价 {summary_price}"
+    if summary_pct is not None:
+        summary += f" 涨跌幅 {summary_pct}%"
+
+    result = push_wxpusher(content, summary)
     if result.get("code") == 1000:
         sent_keys.add(compound_key)
         alert_state[day_key] = sorted(sent_keys)
@@ -241,4 +249,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
